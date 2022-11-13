@@ -1,9 +1,4 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC1090,SC2153,SC2155,SC2034
-#SC1090: Can't follow non-constant source. Use a directive to specify location.
-#SC2153: Possible Misspelling: MYVARIABLE may not be assigned. Did you mean MY_VARIABLE?
-#SC2155 Declare and assign separately to avoid masking return values
-#SC2034: foo appears unused. Verify it or export it.
 set -eu
 
 # Arch Linux Install Script Recovery (alis-recovery) start a recovery for an
@@ -63,19 +58,19 @@ function sanitize_variables() {
     PARTITION_CUSTOMMANUAL_ROOT=$(sanitize_variable "$PARTITION_CUSTOMMANUAL_ROOT")
 
     for I in "${BTRFS_SUBVOLUMES_MOUNTPOINTS[@]}"; do
-        IFS=',' read -ra SUBVOLUME <<< "$I"
-        if [ "${SUBVOLUME[0]}" == "root" ]; then
+        IFS=',' SUBVOLUME=($I)
+        if [ ${SUBVOLUME[0]} == "root" ]; then
             BTRFS_SUBVOLUME_ROOT=("${SUBVOLUME[@]}")
-        elif [ "${SUBVOLUME[0]}" == "swap" ]; then
+        elif [ ${SUBVOLUME[0]} == "swap" ]; then
             BTRFS_SUBVOLUME_SWAP=("${SUBVOLUME[@]}")
         fi
     done
 
     for I in "${PARTITION_MOUNT_POINTS[@]}"; do
-        IFS='=' read -ra PARTITION_MOUNT_POINT <<< "$I"
-        if [ "${PARTITION_MOUNT_POINT[1]}" == "/boot" ]; then
+        IFS='=' PARTITION_MOUNT_POINT=($I)
+        if [ ${PARTITION_MOUNT_POINT[1]} == "/boot" ]; then
             PARTITION_BOOT_NUMBER="${PARTITION_MOUNT_POINT[0]}"
-        elif [ "${PARTITION_MOUNT_POINT[1]}" == "/" ]; then
+        elif [ ${PARTITION_MOUNT_POINT[1]} == "/" ]; then
             PARTITION_ROOT_NUMBER="${PARTITION_MOUNT_POINT[0]}"
         fi
     done
@@ -92,7 +87,7 @@ function check_variables() {
             local DEVICE_BOOT="/dev/$DEVICE_BOOT"
         fi
         local DEVICE_DETECTED="false"
-        if [ -e "/dev/sda" ] && [ "$DEVICE_BOOT" != "/dev/sda" ]; then
+        if [ -e "/dev/sda" -a "$DEVICE_BOOT" != "/dev/sda" ]; then
             if [ "$DEVICE_DETECTED" == "true" ]; then
                 echo "Auto device is ambigous, detected $DEVICE and /dev/sda."
                 exit 1
@@ -101,7 +96,7 @@ function check_variables() {
             DEVICE_SDA="true"
             DEVICE="/dev/sda"
         fi
-        if [ -e "/dev/nvme0n1" ] && [ "$DEVICE_BOOT" != "/dev/nvme0n1" ]; then
+        if [ -e "/dev/nvme0n1" -a "$DEVICE_BOOT" != "/dev/nvme0n1" ]; then
             if [ "$DEVICE_DETECTED" == "true" ]; then
                 echo "Auto device is ambigous, detected $DEVICE and /dev/nvme0n1."
                 exit 1
@@ -110,7 +105,7 @@ function check_variables() {
             DEVICE_NVME="true"
             DEVICE="/dev/nvme0n1"
         fi
-        if [ -e "/dev/vda" ] && [ "$DEVICE_BOOT" != "/dev/vda" ]; then
+        if [ -e "/dev/vda" -a "$DEVICE_BOOT" != "/dev/vda" ]; then
             if [ "$DEVICE_DETECTED" == "true" ]; then
                 echo "Auto device is ambigous, detected $DEVICE and /dev/vda."
                 exit 1
@@ -119,7 +114,7 @@ function check_variables() {
             DEVICE_VDA="true"
             DEVICE="/dev/vda"
         fi
-        if [ -e "/dev/mmcblk0" ] && [ "$DEVICE_BOOT" != "/dev/mmcblk0" ]; then
+        if [ -e "/dev/mmcblk0" -a "$DEVICE_BOOT" != "/dev/mmcblk0" ]; then
             if [ "$DEVICE_DETECTED" == "true" ]; then
                 echo "Auto device is ambigous, detected $DEVICE and /dev/mmcblk0."
                 exit 1
@@ -139,7 +134,7 @@ function check_variables() {
         check_variables_size "BTRFS_SUBVOLUME_SWAP" ${#BTRFS_SUBVOLUME_SWAP[@]} 3
     fi
     for I in "${BTRFS_SUBVOLUMES_MOUNTPOINTS[@]}"; do
-        IFS=',' read -ra SUBVOLUME <<< "$I"
+        IFS=',' SUBVOLUME=($I)
         check_variables_size "SUBVOLUME" ${#SUBVOLUME[@]} 3
     done
     check_variables_list "PARTITION_MODE" "$PARTITION_MODE" "auto custom manual" "true" "true"
@@ -151,7 +146,7 @@ function check_variables() {
 function warning() {
     echo -e "${BLUE}Welcome to Arch Linux Install Script Recovery${NC}"
     echo ""
-    read -r -p "Do you want to continue? [y/N] " yn
+    read -p "Do you want to continue? [y/N] " yn
     case $yn in
         [Yy]* )
             ;;
@@ -177,13 +172,13 @@ function facts() {
 
     facts_commons
 
-    if echo "$DEVICE" | grep -q "^/dev/sd[a-z]"; then
+    if [ -n "$(echo "$DEVICE" | grep "^/dev/sd[a-z]")" ]; then
         DEVICE_SDA="true"
-    elif echo "$DEVICE" | grep -q "^/dev/nvme"; then
+    elif [ -n "$(echo "$DEVICE" | grep "^/dev/nvme")" ]; then
         DEVICE_NVME="true"
-    elif echo "$DEVICE" | grep -q "^/dev/vd[a-z]"; then
+    elif [ -n "$(echo "$DEVICE" | grep "^/dev/vd[a-z]")" ]; then
         DEVICE_VDA="true"
-    elif echo "$DEVICE" | grep -q "^/dev/mmc"; then
+    elif [ -n "$(echo "$DEVICE" | grep "^/dev/mmc")" ]; then
         DEVICE_MMC="true"
     fi
 }
@@ -197,15 +192,15 @@ function prepare() {
 }
 
 function prepare_partition() {
-    if [ -d "${MNT_DIR}"/boot ]; then
-        umount "${MNT_DIR}"/boot
-        umount "${MNT_DIR}"
+    if [ -d /mnt/boot ]; then
+        umount /mnt/boot
+        umount /mnt
     fi
     if [ -e "/dev/mapper/$LVM_VOLUME_GROUP-$LVM_VOLUME_LOGICAL" ]; then
         umount "/dev/mapper/$LVM_VOLUME_GROUP-$LVM_VOLUME_LOGICAL"
     fi
     if [ -e "/dev/mapper/$LUKS_DEVICE_NAME" ]; then
-        cryptsetup close "$LUKS_DEVICE_NAME"
+        cryptsetup close $LUKS_DEVICE_NAME
     fi
     partprobe $DEVICE
 }
@@ -214,9 +209,9 @@ function ask_passwords() {
     if [ "$LUKS_PASSWORD" == "ask" ]; then
         PASSWORD_TYPED="false"
         while [ "$PASSWORD_TYPED" != "true" ]; do
-            read -r -sp 'Type LUKS password: ' LUKS_PASSWORD
+            read -sp 'Type LUKS password: ' LUKS_PASSWORD
             echo ""
-            read -r -sp 'Retype LUKS password: ' LUKS_PASSWORD_RETYPE
+            read -sp 'Retype LUKS password: ' LUKS_PASSWORD_RETYPE
             echo ""
             if [ "$LUKS_PASSWORD" == "$LUKS_PASSWORD_RETYPE" ]; then
                 PASSWORD_TYPED="true"
@@ -235,7 +230,7 @@ function partition() {
 
     # luks and lvm
     if [ -n "$LUKS_PASSWORD" ]; then
-        echo -n "$LUKS_PASSWORD" | cryptsetup --key-file=- open "$PARTITION_ROOT" "$LUKS_DEVICE_NAME"
+        echo -n "$LUKS_PASSWORD" | cryptsetup --key-file=- open $PARTITION_ROOT $LUKS_DEVICE_NAME
         sleep 5
     fi
 
@@ -254,7 +249,7 @@ function partition() {
 }
 
 function recovery() {
-    arch-chroot "${MNT_DIR}"
+    arch-chroot /mnt
 }
 
 function end() {
